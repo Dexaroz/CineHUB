@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="title desc">
+  <title id="title">CineHub Logo - Cámara de cine minimalista</title>
+  <desc id="desc">Cámara de cine estilizada con lentes y cuerpo moderno en gradiente violeta-azul</desc>
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo redondeado -->
+  <rect width="128" height="128" rx="24" fill="#111520"/>
+  <!-- Cuerpo de la cámara --> 
+  <rect x="28" y="50" width="72" height="40" rx="8" fill="url(#grad)"/>
+  <!-- Lente --> 
+  <circle cx="44" cy="70" r="12" fill="#0b0e14" stroke="#22d3ee" stroke-width="3"/>
+  <circle cx="44" cy="70" r="5" fill="#8b5cf6"/>
+  <!-- Bobinas de película --> 
+  <circle cx="84" cy="44" r="10" fill="#0b0e14" stroke="url(#grad)" stroke-width="3"/>
+  <circle cx="104" cy="44" r="10" fill="#0b0e14" stroke="url(#grad)" stroke-width="3"/>
+  <!-- Trípode --> 
+  <path d="M64 90 L48 118 M64 90 L80 118" stroke="#22d3ee" stroke-width="3" stroke-linecap="round"/>
+</svg>

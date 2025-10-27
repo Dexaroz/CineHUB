@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CineHub | Review Peliculas </title>
+  <link rel="icon" href="logo-cine.svg" type="image/svg"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-wrapper">
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+            <img class="logo" src="logo-cine.svg" alt="CineHub" width="42" height="42" />
+        </div>
+          <div>
+          <h1>CineHub</h1>
+          <div class="subtitle">CineHUB | Review de Películas</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search"><input id="q" class="input" placeholder="Buscar por título o género…" /></div>
+        <button id="themeBtn" class="btn theme-btn" type="button" aria-pressed="false" title="Cambiar tema">
+            <span class="theme-icon" aria-hidden="true">🌙</span>
+            <span class="theme-text">Oscuro</span>
+        </button>
+        <button class="btn ghost" id="refreshBtn">Actualizar</button>
+        <button class="btn primary" id="newBtn">Nueva película</button>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <div class="kpi"><div class="label">Películas</div><div class="value" id="kpiTotal">–</div></div>
+      <div class="kpi"><div class="label">Promedio ★</div><div class="value" id="kpiAvg">–</div></div>
+      <div class="kpi"><div class="label">Año más reciente</div><div class="value" id="kpiYear">–</div></div>
+    </section>
+
+    <main id="list" class="grid" aria-live="polite"></main>
+    <div id="empty" class="empty" hidden>Sin resultados. Crea tu primera película con “Nueva película”.</div>
+
+    <div class="modal" id="modal">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <h2 id="modalTitle">Nueva película</h2>
+        <form class="form" id="form">
+          <div class="row">
+            <div>
+              <label>Título</label>
+              <input required type="text" id="title" placeholder="p.ej., Interstellar" />
+            </div>
+            <div>
+              <label>Año</label>
+              <input type="number" id="year" placeholder="2014" min="1888" max="2100" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Género</label>
+              <input type="text" id="genre" placeholder="Sci‑Fi, Drama…" />
+            </div>
+            <div>
+              <label>Valoración (0–5)</label>
+              <input type="number" id="rating" placeholder="4.5" step="0.1" min="0" max="5" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Director</label>
+              <input type="text" id="director" placeholder="Christopher Nolan" />
+            </div>
+            <div>
+              <label>Poster URL</label>
+              <input type="url" id="poster" placeholder="https://…/poster.jpg" />
+            </div>
+          </div>
+          <div>
+            <label>Sinopsis</label>
+            <textarea id="plot" placeholder="Breve descripción…"></textarea>
+          </div>
+          <div class="row">
+            <div>
+              <label>ID (solo edición)</label>
+              <input type="text" id="id" placeholder="Autogenerado" disabled />
+            </div>
+            <div>
+              <label>Duración (min)</label>
+              <input type="number" id="runtime" placeholder="169" min="1" />
+            </div>
+          </div>
+          <div class="footer">
+            <button type="button" class="btn ghost" id="cancelBtn">Cancelar</button>
+            <button type="submit" class="btn primary" id="saveBtn">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">Guardado con éxito</div>
+  </div>
+</div>
+  <script src="index.js"></script>
+</body>
+</html>
