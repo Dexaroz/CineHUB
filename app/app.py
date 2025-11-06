@@ -14,7 +14,7 @@ from app.sharedKernel.cqrs import CommandBus, QueryBus
 from app.sharedKernel.errors import register_error_handlers
 
 
-def get_swagger_config():  # <-- renombrado para no colisionar
+def get_swagger_config():
     swagger_template = {
         "swagger": "2.0",
         "info": {

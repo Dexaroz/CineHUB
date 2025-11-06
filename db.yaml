@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "DynamoDB CineHUB"
+
+Parameters:
+  TableName:
+    Type: String
+    Default: movies
+    Description: Tabla DynamoDB
+
+Resources:
+  MoviesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  TableName:
+    Description: Nombre de la tabla DynamoDB
+    Value: !Ref MoviesTable
+
+  TableArn:
+    Description: ARN de la tabla DynamoDB
+    Value: !GetAtt MoviesTable.Arn

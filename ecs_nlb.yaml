@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CineHUB - ECS Fargate + NLB (mínimo)"
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  ContainerImage:
+    Type: String
+    Description: ECR image URI (e.g., xxxxx.dkr.ecr.us-east-1.amazonaws.com/cinehub:latest)
+  ContainerPort:
+    Type: Number
+    Default: 5000
+  DesiredCount:
+    Type: Number
+    Default: 1
+  Cpu:
+    Type: Number
+    Default: 1024
+  Memory:
+    Type: Number
+    Default: 2048
+  MoviesTableName:
+    Type: String
+    Default: movies
+  DynamoDbTableArn:
+    Type: String
+    Description: ARN de la tabla DynamoDB (p.ej. arn:aws:dynamodb:...:table/movies)
+
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/cinehub"
+      RetentionInDays: 14
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cinehub-exec-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cinehub-task-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDbAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                Resource: !Ref DynamoDbTableArn
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "cinehub-cluster-${AWS::StackName}"
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "cinehub-task-${AWS::StackName}"
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: api
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: api
+          Environment:
+            - Name: MOVIES_TABLE
+              Value: !Ref MoviesTableName
+
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: "SG for ECS Service (from NLB)"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          CidrIp: 0.0.0.0/0  es L4;
+  NLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Subnets: !Ref Subnets
+      Scheme: internal rno para VPC Link;
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Port: !Ref ContainerPort
+      Protocol: TCP
+      TargetType: ip
+      HealthCheckProtocol: TCP
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NLB
+      Port: 80
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: Listener
+    Properties:
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref Subnets
+          SecurityGroups: [ !Ref ServiceSecurityGroup ]
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroup
+          ContainerName: api
+          ContainerPort: !Ref ContainerPort
+      TaskDefinition: !Ref TaskDefinition
+
+Outputs:
+  NlbArn:
+    Value: !Ref NLB
+    Description: ARN del NLB
+  NlbDNS:
+    Value: !GetAtt NLB.DNSName
+    Description: DNS del NLB
+  TargetGroupArn:
+    Value: !Ref TargetGroup
+    Description: ARN del TG
+  ServiceName:
+    Value: !Ref Service
+    Description: Nombre del servicio ECS
