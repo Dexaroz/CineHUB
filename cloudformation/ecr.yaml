@@ -20,7 +20,7 @@ Resources:
             "rules": [
               {
                 "rulePriority": 1,
-                "description": "Mantain only last 2 images",
+                "description": "Mantener las ultimas dos imagenes",
                 "selection": {
                   "tagStatus": "any",
                   "countType": "imageCountMoreThan",
