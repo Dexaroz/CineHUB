@@ -5,7 +5,7 @@ Param(
   [string]$ImageTag = "latest",
   [string]$Dockerfile = "Dockerfile",
   [string]$ContextDir = ".",
-  [string]$EcrUriOverride = ""   # opcional: "123456789012.dkr.ecr.us-east-1.amazonaws.com/cinehub"
+  [string]$EcrUriOverride = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,7 +17,6 @@ Write-Host "==> IMAGE_TAG:   $ImageTag"
 Write-Host "==> DOCKERFILE:  $Dockerfile"
 Write-Host "==> CONTEXT_DIR: $ContextDir"
 
-# Descubrir Account ID y repo URI
 $AccountId = aws sts get-caller-identity --query Account --output text --region $Region
 $BaseEcr   = "$AccountId.dkr.ecr.$Region.amazonaws.com"
 
@@ -38,11 +37,9 @@ Write-Host "==> ACCOUNT_ID:  $AccountId"
 Write-Host "==> ECR BASE:    $BaseEcr"
 Write-Host "==> REPO_URI:    $RepoUri"
 
-# Login en ECR
 aws ecr get-login-password --region $Region `
   | docker login --username AWS --password-stdin $BaseEcr | Out-Null
 
-# Build, tag y push
 docker build -f $Dockerfile -t "$ImageName`:$ImageTag" $ContextDir
 docker tag "$ImageName`:$ImageTag" "$RepoUri`:$ImageTag"
 docker push "$RepoUri`:$ImageTag"
