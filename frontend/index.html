@@ -28,6 +28,7 @@
             <span class="theme-icon" aria-hidden="true">🌙</span>
             <span class="theme-text">Oscuro</span>
         </button>
+        <button class="btn ghost" id="configBtn" title="Configuración de API">⚙️ Config</button>
         <button class="btn ghost" id="refreshBtn">Actualizar</button>
         <button class="btn primary" id="newBtn">Nueva película</button>
       </div>
@@ -40,8 +41,9 @@
     </section>
 
     <main id="list" class="grid" aria-live="polite"></main>
-    <div id="empty" class="empty" hidden>Sin resultados. Crea tu primera película con “Nueva película”.</div>
+    <div id="empty" class="empty" hidden>Sin resultados. Crea tu primera película con "Nueva película".</div>
 
+    <!-- Modal de edición de película -->
     <div class="modal" id="modal">
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <h2 id="modalTitle">Nueva película</h2>
@@ -93,6 +95,56 @@
           <div class="footer">
             <button type="button" class="btn ghost" id="cancelBtn">Cancelar</button>
             <button type="submit" class="btn primary" id="saveBtn">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de configuración de API -->
+    <div class="modal" id="configModal">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="configModalTitle">
+        <h2 id="configModalTitle">⚙️ Configuración de API</h2>
+        <form class="form" id="configForm">
+          <div>
+            <label for="apiUrl">URL Base de la API</label>
+            <input
+              type="text"
+              id="apiUrl"
+              placeholder="http://localhost:5000"
+              required
+            />
+            <small class="hint">Ejemplo: http://localhost:5000 o https://api.ejemplo.com</small>
+          </div>
+
+          <div>
+            <label for="apiKey">API Key (opcional)</label>
+            <input
+              type="text"
+              id="apiKey"
+              placeholder="Tu clave de API"
+            />
+            <small class="hint">Si tu API requiere autenticación, introduce la clave aquí</small>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useMockCheckbox" />
+              <span>Usar datos de prueba (mock)</span>
+            </label>
+            <small class="hint">Activa esto para trabajar sin conexión al backend</small>
+          </div>
+
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useCorsProxyCheckbox" />
+              <span>Usar proxy CORS (solo desarrollo)</span>
+            </label>
+            <small class="hint">Activa esto si tienes problemas de CORS con tu API</small>
+          </div>
+
+          <div class="footer">
+            <button type="button" class="btn ghost" id="cancelConfigBtn">Cancelar</button>
+            <button type="submit" class="btn primary">Guardar y recargar</button>
           </div>
         </form>
       </div>

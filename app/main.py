@@ -1,5 +1,4 @@
 from flask import Flask, jsonify
-from flask_cors import CORS
 
 from app.api import bootstrap_message_bus
 from app.api.routes import create_movies_blueprint
@@ -10,8 +9,6 @@ def create_app() -> Flask:
 
     app.config['JSON_SORT_KEYS'] = False
     app.config['DEBUG'] = settings.FLASK_DEBUG
-
-    CORS(app, resources={r"/*": {"origins": "*"}})
 
     bus = bootstrap_message_bus()
 
@@ -35,6 +32,24 @@ def create_app() -> Flask:
                 'delete_movie': 'DELETE /movies/<id>',
             }
         }), 200
+
+    @app.after_request
+    def add_cors_headers(response):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,X-Api-Key'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
+        return response
+
+    @app.route('/<path:path>', methods=['OPTIONS'])
+    @app.route('/movies', methods=['OPTIONS'])
+    @app.route('/movies/<path:path>', methods=['OPTIONS'])
+    def handle_options(path=None):
+        response = app.make_response('')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,X-Api-Key'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
+        return response, 204
+
 
     return app
 

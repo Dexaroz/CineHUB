@@ -2,12 +2,18 @@
 //   CONFIGURACIÓN API
 // =====================
 const API_BASE_URL = localStorage.getItem('apiBaseUrl') || 'http://localhost:5000';
+const API_KEY = localStorage.getItem('apiKey') || '';
 // false => backend real; true => datos mock
 const USE_MOCK = JSON.parse(localStorage.getItem('useMock') ?? 'false');
+// Usar proxy CORS para desarrollo (solo si hay problemas de CORS)
+const USE_CORS_PROXY = JSON.parse(localStorage.getItem('useCorsProxy') ?? 'false');
+const CORS_PROXY = 'https://corsproxy.io/?';
 
 window.CineHub = {
   setApi(url){ localStorage.setItem('apiBaseUrl', url); location.reload(); },
-  toggleMock(value){ localStorage.setItem('useMock', String(value)); location.reload(); }
+  setApiKey(key){ localStorage.setItem('apiKey', key); location.reload(); },
+  toggleMock(value){ localStorage.setItem('useMock', String(value)); location.reload(); },
+  toggleCorsProxy(value){ localStorage.setItem('useCorsProxy', String(value)); location.reload(); }
 };
 
 const $ = s => document.querySelector(s);
@@ -36,6 +42,15 @@ function openModal(editItem){
   }
 }
 function closeModal(){ $('#modal').classList.remove('open'); }
+
+function openConfigModal(){
+  $('#configModal').classList.add('open');
+  $('#apiUrl').value = API_BASE_URL;
+  $('#apiKey').value = API_KEY;
+  $('#useMockCheckbox').checked = USE_MOCK;
+  $('#useCorsProxyCheckbox').checked = USE_CORS_PROXY;
+}
+function closeConfigModal(){ $('#configModal').classList.remove('open'); }
 
 function renderStars(r=0){
   const n = Math.max(0, Math.min(5, Number(r)||0));
@@ -71,7 +86,7 @@ const mock = {
     { id: 'mv04', title: 'The Shawshank Redemption', year: 1994, genre: 'Drama', rating: 4.9, director: 'Frank Darabont', poster: 'https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg', plot: 'Un hombre acusado injustamente encuentra esperanza y amistad en la cárcel de Shawshank.', runtime:142 },
     { id: 'mv05', title: 'Pulp Fiction', year: 1994, genre: 'Crimen, Drama', rating: 4.7, director: 'Quentin Tarantino', poster: 'https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg', plot: 'Historias entrelazadas de crimen y redención en Los Ángeles.', runtime:154 },
     { id: 'mv06', title: 'The Dark Knight', year: 2008, genre: 'Acción, Crimen, Drama', rating: 4.9, director: 'Christopher Nolan', poster: 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg', plot: 'Batman se enfrenta al Joker, que desata el caos en Gotham.', runtime:152 },
-    { id: 'mv07', title: 'Avatar', year: 2009, genre: 'Aventura, Sci-Fi', rating: 4.3, director: 'James Cameron', poster: 'https://image.tmdb.org/t/p/w500/kyeqWdyUXW608qlYkRqosgbbJyK.jpg', plot: 'Un ex marine se involucra en el conflicto entre humanos y Na’vi en Pandora.', runtime:162 },
+    { id: 'mv07', title: 'Avatar', year: 2009, genre: 'Aventura, Sci-Fi', rating: 4.3, director: 'James Cameron', poster: 'https://image.tmdb.org/t/p/w500/kyeqWdyUXW608qlYkRqosgbbJyK.jpg', plot: 'Un ex marine se involucra en el conflicto entre humanos y Navi en Pandora.', runtime:162 },
     { id: 'mv08', title: 'Your Name', year: 2016, genre: 'Animación, Romance, Fantasía', rating: 4.8, director: 'Makoto Shinkai', poster: 'https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg', plot: 'Dos adolescentes empiezan a intercambiar sus cuerpos a través de los sueños.', runtime:112 },
     { id: 'mv09', title: 'La La Land', year: 2016, genre: 'Romance, Drama, Música', rating: 4.4, director: 'Damien Chazelle', poster: 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg', plot: 'Una actriz y un pianista persiguen sus sueños en Los Ángeles mientras lidian con el amor y la ambición.', runtime:128 },
   ]
@@ -139,14 +154,24 @@ async function api(path='', options={}){
   }
 
   try {
-    const res = await fetch(API_BASE_URL + path, {
-      headers: { 'Content-Type': 'application/json' },
+    const headers = { 'Content-Type': 'application/json' };
+    if (API_KEY) {
+      headers['X-Api-Key'] = API_KEY;
+    }
+
+    // Construir la URL con o sin proxy CORS
+    const targetUrl = USE_CORS_PROXY
+      ? CORS_PROXY + encodeURIComponent(API_BASE_URL + path)
+      : API_BASE_URL + path;
+
+    const res = await fetch(targetUrl, {
+      headers,
       ...options
     });
     return res;
   } catch (e){
     console.error('Network error', e);
-    toast('No se pudo contactar con la API', 2200);
+    toast('No se pudo contactar con la API. Verifica la configuración CORS.', 3000);
     throw e;
   }
 }
@@ -310,28 +335,49 @@ window.editMovie = (m) => openModal(m);
 // =====================
 //   Eventos UI
 // =====================
-$('#newBtn').addEventListener('click', () => openModal());
-$('#cancelBtn').addEventListener('click', closeModal);
-$('#refreshBtn').addEventListener('click', listMovies);
-$('#q').addEventListener('input', () => listMovies());
+document.addEventListener('DOMContentLoaded', () => {
+  $('#newBtn').addEventListener('click', () => openModal());
+  $('#cancelBtn').addEventListener('click', closeModal);
+  $('#refreshBtn').addEventListener('click', listMovies);
+  $('#q').addEventListener('input', () => listMovies());
+  $('#configBtn').addEventListener('click', openConfigModal);
+  $('#cancelConfigBtn').addEventListener('click', closeConfigModal);
 
-$('#form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const movie = {
-    id: $('#id').value || undefined,
-    title: $('#title').value.trim(),
-    year: Number($('#year').value)||undefined,
-    genre: $('#genre').value.trim(),
-    rating: $('#rating').value===''? undefined : Number($('#rating').value),
-    director: $('#director').value.trim(),
-    poster: $('#poster').value.trim(),
-    plot: $('#plot').value.trim(),
-    runtime: $('#runtime').value===''? undefined : Number($('#runtime').value)
-  };
-  if (!movie.title){ toast('El título es obligatorio', 2000); return; }
-  closeModal();
-  if (movie.id){ await updateMovie(movie.id, movie); }
-  else { await createMovie(movie); }
+  $('#form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const movie = {
+      id: $('#id').value || undefined,
+      title: $('#title').value.trim(),
+      year: Number($('#year').value)||undefined,
+      genre: $('#genre').value.trim(),
+      rating: $('#rating').value===''? undefined : Number($('#rating').value),
+      director: $('#director').value.trim(),
+      poster: $('#poster').value.trim(),
+      plot: $('#plot').value.trim(),
+      runtime: $('#runtime').value===''? undefined : Number($('#runtime').value)
+    };
+    if (!movie.title){ toast('El título es obligatorio', 2000); return; }
+    closeModal();
+    if (movie.id){ await updateMovie(movie.id, movie); }
+    else { await createMovie(movie); }
+  });
+
+  $('#configForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = $('#apiUrl').value.trim();
+    const key = $('#apiKey').value.trim();
+    const useMock = $('#useMockCheckbox').checked;
+    const useCorsProxy = $('#useCorsProxyCheckbox').checked;
+
+    localStorage.setItem('apiBaseUrl', url);
+    localStorage.setItem('apiKey', key);
+    localStorage.setItem('useMock', String(useMock));
+    localStorage.setItem('useCorsProxy', String(useCorsProxy));
+
+    closeConfigModal();
+    toast('Configuración guardada. Recargando...', 1500);
+    setTimeout(() => location.reload(), 1500);
+  });
+
+  listMovies();
 });
-
-listMovies();
