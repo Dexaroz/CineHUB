@@ -26,11 +26,11 @@ Parameters:
     Default: "movies"
     Description: DynamoDB table name
 
-Resources:
 # ============================================================================
 # LOAD BALANCER RESOURCES
 # ============================================================================
 
+Resources:
   NLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -63,6 +63,7 @@ Resources:
 # ============================================================================
 # NETWORKING RESOURCES
 # ============================================================================
+
   VPCLink:
     Type: AWS::ApiGateway::VpcLink
     Properties:
@@ -73,6 +74,7 @@ Resources:
 # ============================================================================
 # SECURITY GROUPS
 # ============================================================================
+
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -88,6 +90,7 @@ Resources:
 # ============================================================================
 # ECS RESOURCES
 # ============================================================================
+
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -360,295 +363,288 @@ Resources:
 # API DOCUMENTATION RESOURCES
 # ============================================================================
 
-  APIDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: API
-      Properties: |
-        {
-          "description": "API para gestión de movies con autenticación por API Key. Esta API permite realizar operaciones CRUD sobre una base de datos de vehículos.",
-          "info": {
-            "title": "Movies API",
-            "version": "1.0.0",
-            "contact": {
-              "name": "API Support",
-              "email": "support@example.com"
-            }
+APIDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: API
+    Properties: {
+        "description": "API para gestión de películas (Movies). CRUD protegido por API Key salvo /health.",
+        "info": {
+          "title": "Movies API",
+          "version": "1.0.0",
+          "contact": {
+            "name": "API Support",
+            "email": "support@example.com"
+          }
+        },
+        "security": [
+          { "apiKey": [] }
+        ],
+        "x-error-model": {
+          "type": "object",
+          "properties": {
+            "error": { "type": "string", "example": "BadRequest" },
+            "message": { "type": "string", "example": "Parámetro 'year' inválido" },
+            "code": { "type": "integer", "example": 400 },
+            "requestId": { "type": "string" }
           }
         }
+      }
 
-  MoviesResourceDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: RESOURCE
-        Path: /movies
-      Properties: |
-        {
-          "description": "Recurso para gestionar la colección de movies"
-        }
+MoviesResourceDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: RESOURCE
+      Path: /movies
+    Properties: {
+        "description": "Colección de películas. Permite listar y crear películas."
+      }
 
-  GetMoviesMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /movies
-        Method: GET
-      Properties: |
-        {
-          "summary": "Obtener todos los movies",
-          "description": "Retorna una lista completa de todos los movies almacenados en la base de datos",
-          "tags": ["Movies"],
-          "responses": {
-            "200": {
-              "description": "Lista de movies obtenida exitosamente"
-            },
-            "401": {
-              "description": "No autorizado - API Key inválida o faltante"
-            },
-            "500": {
-              "description": "Error interno del servidor"
-            }
-          }
-        }
-
-  PostMoviesMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /movies
-        Method: POST
-      Properties: |
-        {
-          "summary": "Crear un nuevo movie",
-          "description": "Crea un nuevo movie en la base de datos con los datos proporcionados",
-          "tags": ["Movies"],
-          "requestBody": {
-            "description": "Datos del movie a crear",
-            "required": true,
+GetMoviesMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /movies
+      Method: GET
+    Properties: {
+        "summary": "Listar películas",
+        "description": "Retorna la lista completa de películas.",
+        "tags": ["Movies"],
+        "parameters": [
+          { "name": "title", "in": "query", "required": false, "description": "Filtro por título (contiene).", "schema": { "type": "string" } },
+          { "name": "year", "in": "query", "required": false, "description": "Filtro por año exacto.", "schema": { "type": "integer", "minimum": 1900, "maximum": 2100 } },
+          { "name": "genre", "in": "query", "required": false, "description": "Filtro por género (p. ej., Drama, Sci-Fi).", "schema": { "type": "string" } },
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de películas.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": ["brand", "model", "year"],
-                  "properties": {
-                    "brand": {
-                      "type": "string",
-                      "description": "Marca del vehículo",
-                      "example": "Toyota"
-                    },
-                    "model": {
-                      "type": "string",
-                      "description": "Modelo del vehículo",
-                      "example": "Corolla"
-                    },
-                    "year": {
-                      "type": "integer",
-                      "description": "Año de fabricación",
-                      "minimum": 1900,
-                      "maximum": 2100,
-                      "example": 2023
-                    },
-                    "price": {
-                      "type": "number",
-                      "description": "Precio del vehículo",
-                      "minimum": 0,
-                      "example": 25000.00
-                    }
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Movie" }
+                },
+                "examples": {
+                  "ok": {
+                    "value": [
+                      { "id": "1", "title": "Inception", "year": 2010, "genre": "Sci-Fi", "rating": 8.8 },
+                      { "id": "2", "title": "Interstellar", "year": 2014, "genre": "Sci-Fi", "rating": 8.6 }
+                    ]
                   }
                 }
               }
             }
           },
-          "responses": {
-            "201": {
-              "description": "Movie creado exitosamente"
-            },
-            "400": {
-              "description": "Solicitud inválida - datos incorrectos"
-            },
-            "401": {
-              "description": "No autorizado - API Key inválida"
-            }
-          }
-        }
-
-  MovieResourceDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: RESOURCE
-        Path: /movies/{id}
-      Properties: |
-        {
-          "description": "Recurso para gestionar un movie específico por su ID"
-        }
-
-  GetMovieMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /movies/{id}
-        Method: GET
-      Properties: |
-        {
-          "summary": "Obtener un movie por ID",
-          "description": "Retorna los detalles de un movie específico identificado por su ID",
-          "tags": ["Movies"],
-          "parameters": [
-            {
-              "name": "id",
-              "in": "path",
-              "required": true,
-              "description": "ID único del movie",
-              "schema": {
-                "type": "string"
+          "401": { "description": "No autorizado - API Key inválida o faltante." },
+          "429": { "description": "Demasiadas solicitudes." },
+          "500": { "description": "Error interno del servidor." }
+        },
+        "components": {
+          "schemas": {
+            "Movie": {
+              "type": "object",
+              "required": ["id", "title", "year"],
+              "properties": {
+                "id": { "type": "string", "description": "ID único (UUID o similar)." },
+                "title": { "type": "string" },
+                "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+                "genre": { "type": "string" },
+                "director": { "type": "string" },
+                "rating": { "type": "number", "minimum": 0, "maximum": 10 },
+                "runtime": { "type": "integer", "description": "Duración en minutos.", "minimum": 1 }
               }
             }
-          ],
-          "responses": {
-            "200": {
-              "description": "Movie encontrado"
-            },
-            "404": {
-              "description": "Movie no encontrado"
-            },
-            "401": {
-              "description": "No autorizado"
-            }
           }
         }
+      }
 
-  PutMovieMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /movies/{id}
-        Method: PUT
-      Properties: |
-        {
-          "summary": "Actualizar un movie",
-          "description": "Actualiza los datos de un movie existente",
-          "tags": ["Movies"],
-          "parameters": [
-            {
-              "name": "id",
-              "in": "path",
-              "required": true,
-              "description": "ID del movie a actualizar",
+PostMoviesMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /movies
+      Method: POST
+    Properties: {
+        "summary": "Crear película",
+        "description": "Crea una nueva película.",
+        "tags": ["Movies"],
+        "requestBody": {
+          "description": "Datos de la película a crear.",
+          "required": true,
+          "content": {
+            "application/json": {
               "schema": {
-                "type": "string"
+                "type": "object",
+                "required": ["title", "year", "genre", "director", "rating", "runtime"],
+                "properties": {
+                  "title": { "type": "string", "example": "Inception" },
+                  "year": { "type": "integer", "minimum": 1900, "maximum": 2100, "example": 2010 },
+                  "genre": { "type": "string", "example": "Sci-Fi" },
+                  "director": { "type": "string", "example": "Christopher Nolan" },
+                  "rating": { "type": "number", "minimum": 0, "maximum": 10, "example": 8.8 },
+                  "runtime": { "type": "integer", "minimum": 1, "example": 148 }
+                }
               }
             }
-          ],
-          "responses": {
-            "200": {
-              "description": "Movie actualizado exitosamente"
-            },
-            "404": {
-              "description": "Movie no encontrado"
-            },
-            "400": {
-              "description": "Datos inválidos"
-            }
           }
+        },
+        "responses": {
+          "201": { "description": "Creado. Devuelve Location con /movies/{id}." },
+          "400": { "description": "Solicitud inválida - datos incorrectos." },
+          "401": { "description": "No autorizado - API Key inválida." },
+          "409": { "description": "Conflicto (duplicado)." }
         }
+      }
 
-  DeleteMovieMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /movies/{id}
-        Method: DELETE
-      Properties: |
-        {
-          "summary": "Eliminar un movie",
-          "description": "Elimina un movie de la base de datos",
-          "tags": ["Movies"],
-          "parameters": [
-            {
-              "name": "id",
-              "in": "path",
-              "required": true,
-              "description": "ID del movie a eliminar",
+MovieResourceDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: RESOURCE
+      Path: /movies/{id}
+    Properties: {
+        "description": "Operaciones sobre una película por ID."
+      }
+
+GetMovieMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /movies/{id}
+      Method: GET
+    Properties: {
+        "summary": "Obtener película por ID",
+        "description": "Retorna los detalles de una película.",
+        "tags": ["Movies"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "OK." },
+          "404": { "description": "No encontrado." },
+          "401": { "description": "No autorizado." }
+        }
+      }
+
+PutMovieMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /movies/{id}
+      Method: PUT
+    Properties: {
+        "summary": "Actualizar película",
+        "description": "Reemplaza los datos de una película existente.",
+        "tags": ["Movies"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
               "schema": {
-                "type": "string"
+                "type": "object",
+                "required": ["title", "year"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+                  "genre": { "type": "string" },
+                  "director": { "type": "string" },
+                  "rating": { "type": "number", "minimum": 0, "maximum": 10 },
+                  "runtime": { "type": "integer", "minimum": 1 }
+                }
               }
             }
-          ],
-          "responses": {
-            "204": {
-              "description": "Movie eliminado exitosamente"
-            },
-            "404": {
-              "description": "Movie no encontrado"
-            }
           }
+        },
+        "responses": {
+          "200": { "description": "Actualizado." },
+          "400": { "description": "Datos inválidos." },
+          "404": { "description": "No encontrado." }
         }
+      }
 
-  HealthResourceDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: RESOURCE
-        Path: /health
-      Properties: |
-        {
-          "description": "Endpoint de verificación de salud del servicio"
+DeleteMovieMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /movies/{id}
+      Method: DELETE
+    Properties: {
+        "summary": "Eliminar película",
+        "description": "Elimina una película por ID.",
+        "tags": ["Movies"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Eliminado." },
+          "404": { "description": "No encontrado." }
         }
+      }
 
-  HealthMethodDocumentation:
-    Type: AWS::ApiGateway::DocumentationPart
-    Properties:
-      RestApiId: !Ref RestAPI
-      Location:
-        Type: METHOD
-        Path: /health
-        Method: GET
-      Properties: |
-        {
-          "summary": "Health Check",
-          "description": "Verifica el estado del servicio. No requiere autenticación.",
-          "tags": ["Health"],
-          "responses": {
-            "200": {
-              "description": "Servicio operativo"
-            }
-          }
+HealthResourceDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: RESOURCE
+      Path: /health
+    Properties: {
+        "description": "Endpoint de verificación de salud del servicio."
+      }
+
+HealthMethodDocumentation:
+  Type: AWS::ApiGateway::DocumentationPart
+  Properties:
+    RestApiId: !Ref RestAPI
+    Location:
+      Type: METHOD
+      Path: /health
+      Method: GET
+    Properties: {
+        "summary": "Health Check",
+        "description": "Verifica el estado del servicio. No requiere autenticación.",
+        "tags": ["Health"],
+        "responses": {
+          "200": { "description": "Servicio operativo" }
         }
+      }
 
-  APIDocumentationVersion:
-    Type: AWS::ApiGateway::DocumentationVersion
-    DependsOn:
-      - APIDocumentation
-      - MoviesResourceDocumentation
-      - GetMoviesMethodDocumentation
-      - PostMoviesMethodDocumentation
-      - MovieResourceDocumentation
-      - GetMovieMethodDocumentation
-      - PutMovieMethodDocumentation
-      - DeleteMovieMethodDocumentation
-      - HealthResourceDocumentation
-      - HealthMethodDocumentation
-    Properties:
-      RestApiId: !Ref RestAPI
-      DocumentationVersion: "1.0.0"
-      Description: "Versión inicial de la documentación de Movies API"
+APIDocumentationVersion:
+  Type: AWS::ApiGateway::DocumentationVersion
+  DependsOn:
+    - APIDocumentation
+    - MoviesResourceDocumentation
+    - GetMoviesMethodDocumentation
+    - PostMoviesMethodDocumentation
+    - MovieResourceDocumentation
+    - GetMovieMethodDocumentation
+    - PutMovieMethodDocumentation
+    - DeleteMovieMethodDocumentation
+    - HealthResourceDocumentation
+    - HealthMethodDocumentation
+  Properties:
+    RestApiId: !Ref RestAPI
+    DocumentationVersion: "1.1.0"
+    Description: "Docs Movies API: esquemas/ejemplos, errores y seguridad por API Key."
+
 
 # ============================================================================
 # API DEPLOYMENT RESOURCES
