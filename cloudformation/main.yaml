@@ -10,6 +10,12 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: VPC
+    Default: vpc-0e698f93e63a3b2c5
+
+  VpcCidr:
+    Type: String
+    Description: VPC CIDR Block
+    Default: "172.31.0.0/16"
 
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
@@ -20,28 +26,15 @@ Parameters:
     Default: "movies"
     Description: DynamoDB table name
 
-# ============================================================================
-# NETWORKING RESOURCES
-# ============================================================================
 Resources:
-  ECSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ECS tasks
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+# ============================================================================
+# LOAD BALANCER RESOURCES
+# ============================================================================
 
-  # ============================================================================
-  # LOAD BALANCER RESOURCES
-  # ============================================================================
   NLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: movies-nlb
+      Name: movies-nlb2
       Type: network
       Scheme: internal
       Subnets: !Ref SubnetIds
@@ -67,9 +60,34 @@ Resources:
       Port: 8080
       Protocol: TCP
 
-  # ============================================================================
-  # ECS RESOURCES
-  # ============================================================================
+# ============================================================================
+# NETWORKING RESOURCES
+# ============================================================================
+  VPCLink:
+    Type: AWS::ApiGateway::VpcLink
+    Properties:
+      Name: movies-vpc-link
+      TargetArns:
+        - !Ref NLB
+
+# ============================================================================
+# SECURITY GROUPS
+# ============================================================================
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ECS tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref VpcCidr
+          Description: Allow traffic from NLB
+
+# ============================================================================
+# ECS RESOURCES
+# ============================================================================
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -124,15 +142,9 @@ Resources:
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
 
-  # ============================================================================
-  # API GATEWAY RESOURCES
-  # ============================================================================
-  VPCLink:
-    Type: AWS::ApiGateway::VpcLink
-    Properties:
-      Name: movies-vpc-link
-      TargetArns:
-        - !Ref NLB
+# ============================================================================
+# API GATEWAY RESOURCES
+# ============================================================================
 
   RestAPI:
     Type: AWS::ApiGateway::RestApi
@@ -146,13 +158,6 @@ Resources:
       RestApiId: !Ref RestAPI
       ParentId: !GetAtt RestAPI.RootResourceId
       PathPart: movies
-
-  MovieResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestAPI
-      ParentId: !Ref MoviesResource
-      PathPart: "{id}"
 
   PostMoviesMethod:
     Type: AWS::ApiGateway::Method
@@ -183,6 +188,40 @@ Resources:
         Uri: !Sub "http://${NLB.DNSName}:8080/movies"
         ConnectionType: VPC_LINK
         ConnectionId: !Ref VPCLink
+
+  OptionsMoviesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResourceId: !Ref MoviesResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  MovieResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestAPI
+      ParentId: !Ref MoviesResource
+      PathPart: "{id}"
 
   GetMovieMethod:
     Type: AWS::ApiGateway::Method
@@ -241,33 +280,6 @@ Resources:
         RequestParameters:
           integration.request.path.id: method.request.path.id
 
-  OptionsMoviesMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RestAPI
-      ResourceId: !Ref MoviesResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      ApiKeyRequired: false
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates:
-              application/json: ""
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
   OptionsMovieMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -295,7 +307,6 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Health endpoint added at API root: /health
   HealthResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -318,57 +329,330 @@ Resources:
         ConnectionType: VPC_LINK
         ConnectionId: !Ref VPCLink
 
-  # OpenApi documentation endpoint added at API root: /api-docs
-  ApiDocsResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestAPI
-      ParentId: !GetAtt RestAPI.RootResourceId
-      PathPart: api-docs
-
-  # Proxy resource for all /api-docs/* paths
-  ApiDocsProxyResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RestAPI
-      ParentId: !Ref ApiDocsResource
-      PathPart: "{proxy+}"
-
-  ApiDocsGetMethod:
+  OptionsHealthMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestAPI
-      ResourceId: !Ref ApiDocsResource
-      HttpMethod: GET
+      ResourceId: !Ref HealthResource
+      HttpMethod: OPTIONS
       AuthorizationType: NONE
       ApiKeyRequired: false
       Integration:
-        Type: HTTP_PROXY
-        IntegrationHttpMethod: GET
-        Uri: !Sub "http://${NLB.DNSName}:8080/api-docs"
-        ConnectionType: VPC_LINK
-        ConnectionId: !Ref VPCLink
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
-  # Handle all /api-docs/* requests
-  ApiDocsProxyMethod:
-    Type: AWS::ApiGateway::Method
+# ============================================================================
+# API DOCUMENTATION RESOURCES
+# ============================================================================
+
+  APIDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
     Properties:
       RestApiId: !Ref RestAPI
-      ResourceId: !Ref ApiDocsProxyResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      ApiKeyRequired: false
-      RequestParameters:
-        method.request.path.proxy: true
-      Integration:
-        Type: HTTP_PROXY
-        IntegrationHttpMethod: GET
-        Uri: !Sub "http://${NLB.DNSName}:8080/api-docs/{proxy}"
-        ConnectionType: VPC_LINK
-        ConnectionId: !Ref VPCLink
-        RequestParameters:
-          integration.request.path.proxy: method.request.path.proxy
+      Location:
+        Type: API
+      Properties: |
+        {
+          "description": "API para gestión de movies con autenticación por API Key. Esta API permite realizar operaciones CRUD sobre una base de datos de vehículos.",
+          "info": {
+            "title": "Movies API",
+            "version": "1.0.0",
+            "contact": {
+              "name": "API Support",
+              "email": "support@example.com"
+            }
+          }
+        }
 
+  MoviesResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /movies
+      Properties: |
+        {
+          "description": "Recurso para gestionar la colección de movies"
+        }
+
+  GetMoviesMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies
+        Method: GET
+      Properties: |
+        {
+          "summary": "Obtener todos los movies",
+          "description": "Retorna una lista completa de todos los movies almacenados en la base de datos",
+          "tags": ["Movies"],
+          "responses": {
+            "200": {
+              "description": "Lista de movies obtenida exitosamente"
+            },
+            "401": {
+              "description": "No autorizado - API Key inválida o faltante"
+            },
+            "500": {
+              "description": "Error interno del servidor"
+            }
+          }
+        }
+
+  PostMoviesMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies
+        Method: POST
+      Properties: |
+        {
+          "summary": "Crear un nuevo movie",
+          "description": "Crea un nuevo movie en la base de datos con los datos proporcionados",
+          "tags": ["Movies"],
+          "requestBody": {
+            "description": "Datos del movie a crear",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["brand", "model", "year"],
+                  "properties": {
+                    "brand": {
+                      "type": "string",
+                      "description": "Marca del vehículo",
+                      "example": "Toyota"
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Modelo del vehículo",
+                      "example": "Corolla"
+                    },
+                    "year": {
+                      "type": "integer",
+                      "description": "Año de fabricación",
+                      "minimum": 1900,
+                      "maximum": 2100,
+                      "example": 2023
+                    },
+                    "price": {
+                      "type": "number",
+                      "description": "Precio del vehículo",
+                      "minimum": 0,
+                      "example": 25000.00
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Movie creado exitosamente"
+            },
+            "400": {
+              "description": "Solicitud inválida - datos incorrectos"
+            },
+            "401": {
+              "description": "No autorizado - API Key inválida"
+            }
+          }
+        }
+
+  MovieResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /movies/{id}
+      Properties: |
+        {
+          "description": "Recurso para gestionar un movie específico por su ID"
+        }
+
+  GetMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: GET
+      Properties: |
+        {
+          "summary": "Obtener un movie por ID",
+          "description": "Retorna los detalles de un movie específico identificado por su ID",
+          "tags": ["Movies"],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "ID único del movie",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Movie encontrado"
+            },
+            "404": {
+              "description": "Movie no encontrado"
+            },
+            "401": {
+              "description": "No autorizado"
+            }
+          }
+        }
+
+  PutMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: PUT
+      Properties: |
+        {
+          "summary": "Actualizar un movie",
+          "description": "Actualiza los datos de un movie existente",
+          "tags": ["Movies"],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "ID del movie a actualizar",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Movie actualizado exitosamente"
+            },
+            "404": {
+              "description": "Movie no encontrado"
+            },
+            "400": {
+              "description": "Datos inválidos"
+            }
+          }
+        }
+
+  DeleteMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: DELETE
+      Properties: |
+        {
+          "summary": "Eliminar un movie",
+          "description": "Elimina un movie de la base de datos",
+          "tags": ["Movies"],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "ID del movie a eliminar",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "204": {
+              "description": "Movie eliminado exitosamente"
+            },
+            "404": {
+              "description": "Movie no encontrado"
+            }
+          }
+        }
+
+  HealthResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /health
+      Properties: |
+        {
+          "description": "Endpoint de verificación de salud del servicio"
+        }
+
+  HealthMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /health
+        Method: GET
+      Properties: |
+        {
+          "summary": "Health Check",
+          "description": "Verifica el estado del servicio. No requiere autenticación.",
+          "tags": ["Health"],
+          "responses": {
+            "200": {
+              "description": "Servicio operativo"
+            }
+          }
+        }
+
+  APIDocumentationVersion:
+    Type: AWS::ApiGateway::DocumentationVersion
+    DependsOn:
+      - APIDocumentation
+      - MoviesResourceDocumentation
+      - GetMoviesMethodDocumentation
+      - PostMoviesMethodDocumentation
+      - MovieResourceDocumentation
+      - GetMovieMethodDocumentation
+      - PutMovieMethodDocumentation
+      - DeleteMovieMethodDocumentation
+      - HealthResourceDocumentation
+      - HealthMethodDocumentation
+    Properties:
+      RestApiId: !Ref RestAPI
+      DocumentationVersion: "1.0.0"
+      Description: "Versión inicial de la documentación de Movies API"
+
+# ============================================================================
+# API DEPLOYMENT RESOURCES
+# ============================================================================
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -380,8 +664,6 @@ Resources:
       - OptionsMoviesMethod
       - OptionsMovieMethod
       - HealthGetMethod
-      - ApiDocsGetMethod
-      - ApiDocsProxyMethod
     Properties:
       RestApiId: !Ref RestAPI
 
@@ -391,6 +673,9 @@ Resources:
       RestApiId: !Ref RestAPI
       DeploymentId: !Ref APIDeployment
       StageName: prod
+      AccessLogSetting:
+        DestinationArn: !GetAtt APIGatewayLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}'
 
   APIKey:
     Type: AWS::ApiGateway::ApiKey
@@ -414,6 +699,62 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
+  # ===========================================================================
+  # CLOUDWATCH ALARMS
+  # ===========================================================================
+
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-Api-5xx-Alarm"
+      AlarmDescription: "Alarm when API Gateway returns 5xx errors"
+      Namespace: "AWS/ApiGateway"
+      MetricName: "5XXError"
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref RestAPI
+        - Name: Stage
+          Value: prod
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  ApiHighUsageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-Api-High-Usage"
+      AlarmDescription: "Alarm when API request count is high (spike)"
+      Namespace: "AWS/ApiGateway"
+      MetricName: "Count"
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref RestAPI
+        - Name: Stage
+          Value: prod
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1000
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+# ===========================================================================
+# CLOUDWATCH LOG GROUPS
+# ===========================================================================
+
+  APIGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/movies
+      RetentionInDays: 7
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
 # ============================================================================
 # OUTPUTS
 # ============================================================================
@@ -426,10 +767,6 @@ Outputs:
     Description: API Key ID
     Value: !Ref APIKey
 
-  SwaggerUIUrl:
-    Description: Swagger UI Documentation URL (via /api-docs)
-    Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod/api-docs"
-
   HealthCheckUrl:
     Description: Health Check Endpoint
     Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod/health"
@@ -437,3 +774,27 @@ Outputs:
   MoviesEndpoint:
     Description: Movies API Endpoint
     Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod/movies"
+
+  ECSClusterName:
+    Description: ECS Cluster name
+    Value: !Ref ECSCluster
+
+  ECSServiceName:
+    Description: ECS Service name
+    Value: !Ref ECSService
+
+  ECSLogGroupName:
+    Description: ECS CloudWatch Log Group name
+    Value: "/ecs/movies"
+
+  ECSLogGroupArn:
+    Description: ECS CloudWatch Log Group ARN
+    Value: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/movies"
+
+  APIGatewayLogGroupName:
+    Description: API Gateway CloudWatch Log Group name
+    Value: !Ref APIGatewayLogGroup
+
+  APIGatewayLogGroupArn:
+    Description: API Gateway CloudWatch Log Group ARN
+    Value: !GetAtt APIGatewayLogGroup.Arn
