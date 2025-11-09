@@ -1,8 +1,8 @@
-from flask import jsonify, Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 
-from app.api.bootstrap import bootstrap_message_bus
-from app.api.routes.movies import create_movies_blueprint
+from app.api import bootstrap_message_bus
+from app.api.routes import create_movies_blueprint
 from app.config import settings
 
 def create_app() -> Flask:
@@ -37,3 +37,9 @@ def create_app() -> Flask:
         }), 200
 
     return app
+
+app = create_app()
+
+if __name__ == '__main__':
+    port = int(getattr(settings, "PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=bool(getattr(settings, "FLASK_DEBUG", True)))

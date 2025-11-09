@@ -9,7 +9,7 @@ from app.application.commands.update_movie import UpdateMovie
 from app.application.dtos.movie_in import MovieIn
 from app.application.queries.get_movie import GetMovie
 from app.application.queries.get_movies import GetMovies
-from app.infraestructure.dynamodb_unit_of_work import DynamoDBUnitOfWork
+from app.infrastructure.dynamodb_unit_of_work import DynamoDBUnitOfWork
 from app.service.message_bus import MessageBus
 
 

@@ -4,7 +4,7 @@ from botocore.exceptions import ClientError
 from app.application.id_generator.id_incremental_generator import id_generator
 from app.application.unit_of_work import UnitOfWork
 from app.config import settings
-from app.infraestructure.dynamodb_repository import DynamoDBMovieRepository
+from app.infrastructure.dynamodb_repository import DynamoDBMovieRepository
 
 
 class DynamoDBUnitOfWork(UnitOfWork):
