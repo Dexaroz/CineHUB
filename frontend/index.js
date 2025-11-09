@@ -156,7 +156,7 @@ async function api(path='', options={}){
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (API_KEY) {
-      headers['X-Api-Key'] = API_KEY;
+      headers['X-api-key'] = API_KEY;
     }
 
     // Construir la URL con o sin proxy CORS

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "ECS Fargate + API Gateway REST API with API Key"
+Description: "ECS Fargate + API Gateway REST API (API Key + CORS + Docs)"
 
 Parameters:
   ImageName:
@@ -10,7 +10,7 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: VPC
-    Default: vpc-0e698f93e63a3b2c5
+    Default: vpc-04f4b0340cb9910ee
 
   VpcCidr:
     Type: String
@@ -26,11 +26,10 @@ Parameters:
     Default: "movies"
     Description: DynamoDB table name
 
-# ============================================================================
-# LOAD BALANCER RESOURCES
-# ============================================================================
-
 Resources:
+  # ============================================================================
+  # LOAD BALANCER (NLB) + TG + LISTENER
+  # ============================================================================
   NLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -60,10 +59,9 @@ Resources:
       Port: 8080
       Protocol: TCP
 
-# ============================================================================
-# NETWORKING RESOURCES
-# ============================================================================
-
+  # ============================================================================
+  # API GATEWAY VPC LINK
+  # ============================================================================
   VPCLink:
     Type: AWS::ApiGateway::VpcLink
     Properties:
@@ -71,10 +69,9 @@ Resources:
       TargetArns:
         - !Ref NLB
 
-# ============================================================================
-# SECURITY GROUPS
-# ============================================================================
-
+  # ============================================================================
+  # SECURITY GROUPS
+  # ============================================================================
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -87,10 +84,9 @@ Resources:
           CidrIp: !Ref VpcCidr
           Description: Allow traffic from NLB
 
-# ============================================================================
-# ECS RESOURCES
-# ============================================================================
-
+  # ============================================================================
+  # ECS CLUSTER / TASK / SERVICE
+  # ============================================================================
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -145,10 +141,9 @@ Resources:
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
 
-# ============================================================================
-# API GATEWAY RESOURCES
-# ============================================================================
-
+  # ============================================================================
+  # API GATEWAY (REST) + METHODS + CORS
+  # ============================================================================
   RestAPI:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -205,8 +200,8 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             ResponseTemplates:
               application/json: ""
@@ -296,8 +291,8 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             ResponseTemplates:
               application/json: ""
@@ -345,7 +340,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,x-api-key'"
+              method.response.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             ResponseTemplates:
@@ -359,296 +354,52 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-# ============================================================================
-# API DOCUMENTATION RESOURCES
-# ============================================================================
+  # ============================================================================
+  # API GATEWAY GATEWAYRESPONSES (CORS EN ERRORES 4XX/5XX)
+  # ============================================================================
+  GatewayResponseDefault4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
 
-APIDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: API
-    Properties: {
-        "description": "API para gestión de películas (Movies). CRUD protegido por API Key salvo /health.",
-        "info": {
-          "title": "Movies API",
-          "version": "1.0.0",
-          "contact": {
-            "name": "API Support",
-            "email": "support@example.com"
-          }
-        },
-        "security": [
-          { "apiKey": [] }
-        ],
-        "x-error-model": {
-          "type": "object",
-          "properties": {
-            "error": { "type": "string", "example": "BadRequest" },
-            "message": { "type": "string", "example": "Parámetro 'year' inválido" },
-            "code": { "type": "integer", "example": 400 },
-            "requestId": { "type": "string" }
-          }
-        }
-      }
+  GatewayResponseDefault5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
 
-MoviesResourceDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: RESOURCE
-      Path: /movies
-    Properties: {
-        "description": "Colección de películas. Permite listar y crear películas."
-      }
+  GatewayResponseInvalidApiKey:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResponseType: INVALID_API_KEY
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
 
-GetMoviesMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /movies
-      Method: GET
-    Properties: {
-        "summary": "Listar películas",
-        "description": "Retorna la lista completa de películas.",
-        "tags": ["Movies"],
-        "parameters": [
-          { "name": "title", "in": "query", "required": false, "description": "Filtro por título (contiene).", "schema": { "type": "string" } },
-          { "name": "year", "in": "query", "required": false, "description": "Filtro por año exacto.", "schema": { "type": "integer", "minimum": 1900, "maximum": 2100 } },
-          { "name": "genre", "in": "query", "required": false, "description": "Filtro por género (p. ej., Drama, Sci-Fi).", "schema": { "type": "string" } },
-        ],
-        "responses": {
-          "200": {
-            "description": "Lista de películas.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/Movie" }
-                },
-                "examples": {
-                  "ok": {
-                    "value": [
-                      { "id": "1", "title": "Inception", "year": 2010, "genre": "Sci-Fi", "rating": 8.8 },
-                      { "id": "2", "title": "Interstellar", "year": 2014, "genre": "Sci-Fi", "rating": 8.6 }
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "401": { "description": "No autorizado - API Key inválida o faltante." },
-          "429": { "description": "Demasiadas solicitudes." },
-          "500": { "description": "Error interno del servidor." }
-        },
-        "components": {
-          "schemas": {
-            "Movie": {
-              "type": "object",
-              "required": ["id", "title", "year"],
-              "properties": {
-                "id": { "type": "string", "description": "ID único (UUID o similar)." },
-                "title": { "type": "string" },
-                "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
-                "genre": { "type": "string" },
-                "director": { "type": "string" },
-                "rating": { "type": "number", "minimum": 0, "maximum": 10 },
-                "runtime": { "type": "integer", "description": "Duración en minutos.", "minimum": 1 }
-              }
-            }
-          }
-        }
-      }
+  GatewayResponseMissingAuth:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResponseType: MISSING_AUTHENTICATION_TOKEN
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS,PATCH'"
 
-PostMoviesMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /movies
-      Method: POST
-    Properties: {
-        "summary": "Crear película",
-        "description": "Crea una nueva película.",
-        "tags": ["Movies"],
-        "requestBody": {
-          "description": "Datos de la película a crear.",
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["title", "year", "genre", "director", "rating", "runtime"],
-                "properties": {
-                  "title": { "type": "string", "example": "Inception" },
-                  "year": { "type": "integer", "minimum": 1900, "maximum": 2100, "example": 2010 },
-                  "genre": { "type": "string", "example": "Sci-Fi" },
-                  "director": { "type": "string", "example": "Christopher Nolan" },
-                  "rating": { "type": "number", "minimum": 0, "maximum": 10, "example": 8.8 },
-                  "runtime": { "type": "integer", "minimum": 1, "example": 148 }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": { "description": "Creado. Devuelve Location con /movies/{id}." },
-          "400": { "description": "Solicitud inválida - datos incorrectos." },
-          "401": { "description": "No autorizado - API Key inválida." },
-          "409": { "description": "Conflicto (duplicado)." }
-        }
-      }
-
-MovieResourceDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: RESOURCE
-      Path: /movies/{id}
-    Properties: {
-        "description": "Operaciones sobre una película por ID."
-      }
-
-GetMovieMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /movies/{id}
-      Method: GET
-    Properties: {
-        "summary": "Obtener película por ID",
-        "description": "Retorna los detalles de una película.",
-        "tags": ["Movies"],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": { "description": "OK." },
-          "404": { "description": "No encontrado." },
-          "401": { "description": "No autorizado." }
-        }
-      }
-
-PutMovieMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /movies/{id}
-      Method: PUT
-    Properties: {
-        "summary": "Actualizar película",
-        "description": "Reemplaza los datos de una película existente.",
-        "tags": ["Movies"],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["title", "year"],
-                "properties": {
-                  "title": { "type": "string" },
-                  "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
-                  "genre": { "type": "string" },
-                  "director": { "type": "string" },
-                  "rating": { "type": "number", "minimum": 0, "maximum": 10 },
-                  "runtime": { "type": "integer", "minimum": 1 }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Actualizado." },
-          "400": { "description": "Datos inválidos." },
-          "404": { "description": "No encontrado." }
-        }
-      }
-
-DeleteMovieMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /movies/{id}
-      Method: DELETE
-    Properties: {
-        "summary": "Eliminar película",
-        "description": "Elimina una película por ID.",
-        "tags": ["Movies"],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "204": { "description": "Eliminado." },
-          "404": { "description": "No encontrado." }
-        }
-      }
-
-HealthResourceDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: RESOURCE
-      Path: /health
-    Properties: {
-        "description": "Endpoint de verificación de salud del servicio."
-      }
-
-HealthMethodDocumentation:
-  Type: AWS::ApiGateway::DocumentationPart
-  Properties:
-    RestApiId: !Ref RestAPI
-    Location:
-      Type: METHOD
-      Path: /health
-      Method: GET
-    Properties: {
-        "summary": "Health Check",
-        "description": "Verifica el estado del servicio. No requiere autenticación.",
-        "tags": ["Health"],
-        "responses": {
-          "200": { "description": "Servicio operativo" }
-        }
-      }
-
-APIDocumentationVersion:
-  Type: AWS::ApiGateway::DocumentationVersion
-  DependsOn:
-    - APIDocumentation
-    - MoviesResourceDocumentation
-    - GetMoviesMethodDocumentation
-    - PostMoviesMethodDocumentation
-    - MovieResourceDocumentation
-    - GetMovieMethodDocumentation
-    - PutMovieMethodDocumentation
-    - DeleteMovieMethodDocumentation
-    - HealthResourceDocumentation
-    - HealthMethodDocumentation
-  Properties:
-    RestApiId: !Ref RestAPI
-    DocumentationVersion: "1.1.0"
-    Description: "Docs Movies API: esquemas/ejemplos, errores y seguridad por API Key."
-
-
-# ============================================================================
-# API DEPLOYMENT RESOURCES
-# ============================================================================
+  # ============================================================================
+  # API DEPLOYMENT + STAGE + LOGS + API KEY / USAGE PLAN
+  # ============================================================================
   APIDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -660,8 +411,24 @@ APIDocumentationVersion:
       - OptionsMoviesMethod
       - OptionsMovieMethod
       - HealthGetMethod
+      - OptionsHealthMethod
+      - GatewayResponseDefault4XX
+      - GatewayResponseDefault5XX
+      - GatewayResponseInvalidApiKey
+      - GatewayResponseMissingAuth
     Properties:
       RestApiId: !Ref RestAPI
+
+  APIGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/movies
+      RetentionInDays: 7
+
+  ApiGatewayAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
 
   APIStage:
     Type: AWS::ApiGateway::Stage
@@ -671,13 +438,16 @@ APIDocumentationVersion:
       StageName: prod
       AccessLogSetting:
         DestinationArn: !GetAtt APIGatewayLogGroup.Arn
-        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}'
+        Format: >
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp","caller":"$context.identity.caller","user":"$context.identity.user","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","resourcePath":"$context.resourcePath","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength"}
 
   APIKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
       Name: movies-api-key
       Enabled: true
+      # Opcional: fija un valor conocido para facilitar pruebas
+      # Value: your-strong-random-key
 
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
@@ -695,69 +465,270 @@ APIDocumentationVersion:
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
-  # ===========================================================================
-  # CLOUDWATCH ALARMS
-  # ===========================================================================
-
-  Api5xxAlarm:
-    Type: AWS::CloudWatch::Alarm
+  # ============================================================================
+  # API DOCUMENTATION (DocumentationPart + Version)
+  # ============================================================================
+  APIDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
     Properties:
-      AlarmName: !Sub "${AWS::StackName}-Api-5xx-Alarm"
-      AlarmDescription: "Alarm when API Gateway returns 5xx errors"
-      Namespace: "AWS/ApiGateway"
-      MetricName: "5XXError"
-      Dimensions:
-        - Name: ApiId
-          Value: !Ref RestAPI
-        - Name: Stage
-          Value: prod
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: API
+      Properties: |
+        {
+          "description": "API para gestión de películas (Movies). CRUD protegido por API Key salvo /health.",
+          "info": {
+            "title": "Movies API",
+            "version": "1.0.0",
+            "contact": {
+              "name": "API Support",
+              "email": "support@example.com"
+            }
+          },
+          "security": [
+            { "apiKey": [] }
+          ],
+          "x-error-model": {
+            "type": "object",
+            "properties": {
+              "error": { "type": "string", "example": "BadRequest" },
+              "message": { "type": "string", "example": "Parámetro 'year' inválido" },
+              "code": { "type": "integer", "example": 400 },
+              "requestId": { "type": "string" }
+            }
+          }
+        }
 
-  ApiHighUsageAlarm:
-    Type: AWS::CloudWatch::Alarm
+  MoviesResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
     Properties:
-      AlarmName: !Sub "${AWS::StackName}-Api-High-Usage"
-      AlarmDescription: "Alarm when API request count is high (spike)"
-      Namespace: "AWS/ApiGateway"
-      MetricName: "Count"
-      Dimensions:
-        - Name: ApiId
-          Value: !Ref RestAPI
-        - Name: Stage
-          Value: prod
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1000
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /movies
+      Properties: |
+        {
+          "description": "Colección de películas. Permite listar y crear películas."
+        }
 
-# ===========================================================================
-# CLOUDWATCH LOG GROUPS
-# ===========================================================================
-
-  APIGatewayLogGroup:
-    Type: AWS::Logs::LogGroup
+  GetMoviesMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
     Properties:
-      LogGroupName: /aws/apigateway/movies
-      RetentionInDays: 7
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies
+        Method: GET
+      Properties: |
+        {
+          "summary": "Listar películas",
+          "description": "Retorna la lista completa de películas.",
+          "tags": ["Movies"],
+          "parameters": [
+            { "name": "title", "in": "query", "required": false, "description": "Filtro por título (contiene).", "schema": { "type": "string" } },
+            { "name": "year", "in": "query", "required": false, "description": "Filtro por año exacto.", "schema": { "type": "integer", "minimum": 1900, "maximum": 2100 } },
+            { "name": "genre", "in": "query", "required": false, "description": "Filtro por género (p. ej., Drama, Sci-Fi).", "schema": { "type": "string" } }
+          ],
+          "responses": {
+            "200": { "description": "Lista de películas." },
+            "401": { "description": "No autorizado - API Key inválida o faltante." },
+            "429": { "description": "Demasiadas solicitudes." },
+            "500": { "description": "Error interno del servidor." }
+          }
+        }
 
-  ApiGatewayAccount:
-    Type: AWS::ApiGateway::Account
+  PostMoviesMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
     Properties:
-      CloudWatchRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
-# ============================================================================
-# OUTPUTS
-# ============================================================================
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies
+        Method: POST
+      Properties: |
+        {
+          "summary": "Crear película",
+          "description": "Crea una nueva película.",
+          "tags": ["Movies"],
+          "requestBody": {
+            "description": "Datos de la película a crear.",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["title", "year", "genre", "director", "rating", "runtime"],
+                  "properties": {
+                    "title": { "type": "string", "example": "Inception" },
+                    "year": { "type": "integer", "minimum": 1900, "maximum": 2100, "example": 2010 },
+                    "genre": { "type": "string", "example": "Sci-Fi" },
+                    "director": { "type": "string", "example": "Christopher Nolan" },
+                    "rating": { "type": "number", "minimum": 0, "maximum": 10, "example": 8.8 },
+                    "runtime": { "type": "integer", "minimum": 1, "example": 148 }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": { "description": "Creado. Devuelve Location con /movies/{id}." },
+            "400": { "description": "Solicitud inválida - datos incorrectos." },
+            "401": { "description": "No autorizado - API Key inválida." },
+            "409": { "description": "Conflicto (duplicado)." }
+          }
+        }
+
+  MovieResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /movies/{id}
+      Properties: |
+        {
+          "description": "Operaciones sobre una película por ID."
+        }
+
+  GetMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: GET
+      Properties: |
+        {
+          "summary": "Obtener película por ID",
+          "description": "Retorna los detalles de una película.",
+          "tags": ["Movies"],
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+          ],
+          "responses": {
+            "200": { "description": "OK." },
+            "404": { "description": "No encontrado." },
+            "401": { "description": "No autorizado." }
+          }
+        }
+
+  PutMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: PUT
+      Properties: |
+        {
+          "summary": "Actualizar película",
+          "description": "Reemplaza los datos de una película existente.",
+          "tags": ["Movies"],
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["title", "year"],
+                  "properties": {
+                    "title": { "type": "string" },
+                    "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+                    "genre": { "type": "string" },
+                    "director": { "type": "string" },
+                    "rating": { "type": "number", "minimum": 0, "maximum": 10 },
+                    "runtime": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": { "description": "Actualizado." },
+            "400": { "description": "Datos inválidos." },
+            "404": { "description": "No encontrado." }
+          }
+        }
+
+  DeleteMovieMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /movies/{id}
+        Method: DELETE
+      Properties: |
+        {
+          "summary": "Eliminar película",
+          "description": "Elimina una película por ID.",
+          "tags": ["Movies"],
+          "parameters": [
+            { "name": "id", "in": "path", "required": true, "description": "ID de la película.", "schema": { "type": "string" } }
+          ],
+          "responses": {
+            "204": { "description": "Eliminado." },
+            "404": { "description": "No encontrado." }
+          }
+        }
+
+  HealthResourceDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: RESOURCE
+        Path: /health
+      Properties: |
+        {
+          "description": "Endpoint de verificación de salud del servicio."
+        }
+
+  HealthMethodDocumentation:
+    Type: AWS::ApiGateway::DocumentationPart
+    Properties:
+      RestApiId: !Ref RestAPI
+      Location:
+        Type: METHOD
+        Path: /health
+        Method: GET
+      Properties: |
+        {
+          "summary": "Health Check",
+          "description": "Verifica el estado del servicio. No requiere autenticación.",
+          "tags": ["Health"],
+          "responses": {
+            "200": { "description": "Servicio operativo" }
+          }
+        }
+
+  APIDocumentationVersion:
+    Type: AWS::ApiGateway::DocumentationVersion
+    DependsOn:
+      - APIDocumentation
+      - MoviesResourceDocumentation
+      - GetMoviesMethodDocumentation
+      - PostMoviesMethodDocumentation
+      - MovieResourceDocumentation
+      - GetMovieMethodDocumentation
+      - PutMovieMethodDocumentation
+      - DeleteMovieMethodDocumentation
+      - HealthResourceDocumentation
+      - HealthMethodDocumentation
+    Properties:
+      RestApiId: !Ref RestAPI
+      DocumentationVersion: "1.1.0"
+      Description: "Docs Movies API: esquemas/ejemplos, errores y seguridad por API Key."
+
 Outputs:
   APIEndpoint:
     Description: API Gateway URL
-    Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod"
+    Value: !Sub "https://${RestAPI}.execute-api.${AWS::Region}.amazonaws.com/prod"
 
   APIKeyId:
     Description: API Key ID
@@ -765,11 +736,11 @@ Outputs:
 
   HealthCheckUrl:
     Description: Health Check Endpoint
-    Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod/health"
+    Value: !Sub "https://${RestAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/health"
 
   MoviesEndpoint:
     Description: Movies API Endpoint
-    Value: !Sub "https://${RestAPI}.execute-api.us-east-1.amazonaws.com/prod/movies"
+    Value: !Sub "https://${RestAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/movies"
 
   ECSClusterName:
     Description: ECS Cluster name
