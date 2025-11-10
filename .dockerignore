@@ -9,6 +9,6 @@ __pycache__/
 dist
 build
 node_modules
-Dockerfile
+Dockerfile.acoplada
 *.yaml
 frontend/

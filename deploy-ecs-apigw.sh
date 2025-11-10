@@ -4,7 +4,7 @@ set -euo pipefail
 # ===== Config =====
 STACK_NAME="${STACK_NAME:-cinehub-ecs-apigw}"
 REGION="${AWS_REGION:-us-east-1}"
-TEMPLATE_FILE="${TEMPLATE_FILE:-cloudformation/main.yaml}"
+TEMPLATE_FILE="${TEMPLATE_FILE:-cloudformation/ecs-apigw.yaml}"
 
 IMAGE_NAME="${IMAGE_NAME:-movie-app:latest}"
 VPC_ID="${VPC_ID:-vpc-04f4b0340cb9910ee}"

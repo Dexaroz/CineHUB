@@ -1,34 +1,13 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Movies (desacoplada): DynamoDB + Lambdas (imagen ECR) + API Gateway REST + API Key + CORS"
+Description: "Movies API: Lambdas (ECR) + API Gateway REST + API Key + CORS"
 
 Parameters:
-  EcrImageName:
-    Type: String
-    Default: "movie-app-lambda:latest"
-    Description: "Nombre:tag de la imagen en ECR (p.ej. repo/movie-app-lambda:latest)"
   DDBTableName:
     Type: String
-    Default: "movies"
-    Description: "Nombre de la tabla DynamoDB"
+    Default: "MoviesTable"
+    Description: "Nombre de la tabla DynamoDB existente"
 
 Resources:
-  # =========================
-  # DynamoDB
-  # =========================
-  MoviesTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Ref DDBTableName
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: N
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      SSESpecification:
-        SSEEnabled: true
-
   # =========================
   # Lambdas (misma imagen) x5
   # =========================
@@ -38,7 +17,7 @@ Resources:
       FunctionName: movies-list
       PackageType: Image
       Code:
-        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImageName}"
+        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/movie-app-lambda:latest"
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Timeout: 15
       MemorySize: 256
@@ -47,7 +26,6 @@ Resources:
         Variables:
           HANDLER_NAME: list
           DDB_TABLE_NAME: !Ref DDBTableName
-          AWS_REGION: !Ref AWS::Region
 
   GetMovieFn:
     Type: AWS::Lambda::Function
@@ -55,7 +33,7 @@ Resources:
       FunctionName: movies-get
       PackageType: Image
       Code:
-        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImageName}"
+        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/movie-app-lambda:latest"
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Timeout: 15
       MemorySize: 256
@@ -64,7 +42,6 @@ Resources:
         Variables:
           HANDLER_NAME: get
           DDB_TABLE_NAME: !Ref DDBTableName
-          AWS_REGION: !Ref AWS::Region
 
   CreateMovieFn:
     Type: AWS::Lambda::Function
@@ -72,7 +49,7 @@ Resources:
       FunctionName: movies-create
       PackageType: Image
       Code:
-        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImageName}"
+        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/movie-app-lambda:latest"
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Timeout: 15
       MemorySize: 256
@@ -81,7 +58,6 @@ Resources:
         Variables:
           HANDLER_NAME: create
           DDB_TABLE_NAME: !Ref DDBTableName
-          AWS_REGION: !Ref AWS::Region
 
   UpdateMovieFn:
     Type: AWS::Lambda::Function
@@ -89,7 +65,7 @@ Resources:
       FunctionName: movies-update
       PackageType: Image
       Code:
-        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImageName}"
+        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/movie-app-lambda:latest"
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Timeout: 15
       MemorySize: 256
@@ -98,7 +74,6 @@ Resources:
         Variables:
           HANDLER_NAME: update
           DDB_TABLE_NAME: !Ref DDBTableName
-          AWS_REGION: !Ref AWS::Region
 
   DeleteMovieFn:
     Type: AWS::Lambda::Function
@@ -106,7 +81,7 @@ Resources:
       FunctionName: movies-delete
       PackageType: Image
       Code:
-        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrImageName}"
+        ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/movie-app-lambda:latest"
       Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Timeout: 15
       MemorySize: 256
@@ -115,56 +90,82 @@ Resources:
         Variables:
           HANDLER_NAME: delete
           DDB_TABLE_NAME: !Ref DDBTableName
-          AWS_REGION: !Ref AWS::Region
 
+  # =========================
   # Log groups (retención corta)
+  # =========================
   ListMoviesLog:
     Type: AWS::Logs::LogGroup
-    Properties: { LogGroupName: !Sub "/aws/lambda/${ListMoviesFn}", RetentionInDays: 7 }
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ListMoviesFn}"
+      RetentionInDays: 7
+
   GetMovieLog:
     Type: AWS::Logs::LogGroup
-    Properties: { LogGroupName: !Sub "/aws/lambda/${GetMovieFn}", RetentionInDays: 7 }
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${GetMovieFn}"
+      RetentionInDays: 7
+
   CreateMovieLog:
     Type: AWS::Logs::LogGroup
-    Properties: { LogGroupName: !Sub "/aws/lambda/${CreateMovieFn}", RetentionInDays: 7 }
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${CreateMovieFn}"
+      RetentionInDays: 7
+
   UpdateMovieLog:
     Type: AWS::Logs::LogGroup
-    Properties: { LogGroupName: !Sub "/aws/lambda/${UpdateMovieFn}", RetentionInDays: 7 }
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${UpdateMovieFn}"
+      RetentionInDays: 7
+
   DeleteMovieLog:
     Type: AWS::Logs::LogGroup
-    Properties: { LogGroupName: !Sub "/aws/lambda/${DeleteMovieFn}", RetentionInDays: 7 }
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DeleteMovieFn}"
+      RetentionInDays: 7
 
+  # =========================
   # Permisos de invocación desde API Gateway
+  # =========================
   PermList:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref ListMoviesFn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*"
+
   PermGet:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref GetMovieFn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*"
+
   PermCreate:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref CreateMovieFn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*"
+
   PermUpdate:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref UpdateMovieFn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*"
+
   PermDelete:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref DeleteMovieFn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/*"
 
   # =========================
   # API Gateway REST + CORS + API Key
@@ -173,8 +174,8 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: movies-lambda-api
-      EndpointConfiguration: { Types: [REGIONAL] }
-      Description: "API Movies sobre Lambdas (imagen ECR)"
+      EndpointConfiguration: { Types: [ REGIONAL ] }
+      Description: "API Movies sobre Lambdas con ECR"
 
   MoviesRes:
     Type: AWS::ApiGateway::Resource
@@ -310,6 +311,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteMovieFn.Arn}/invocations"
 
+  # CORS en respuestas de error
   GWResp4XX:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
@@ -330,6 +332,7 @@ Resources:
         gatewayresponse.header.Access-Control-Allow-Headers: "'content-type,x-api-key,accept'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
 
+  # Despliegue API
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -352,25 +355,24 @@ Resources:
       DeploymentId: !Ref ApiDeployment
       StageName: prod
 
+  # API Key SIN StageKeys
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
-    DependsOn: ApiDeployment
     Properties:
-      Name: movies-api-key
+      Name: movies-api-key-lambda
       Enabled: true
-      StageKeys:
-        - RestApiId: !Ref RestApi
-          StageName: prod
 
+  # UsagePlan con referencia al Stage
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
-    DependsOn: ApiDeployment
+    DependsOn: StageProd
     Properties:
       UsagePlanName: movies-usage
       ApiStages:
         - ApiId: !Ref RestApi
-          Stage: prod
+          Stage: !Ref StageProd
 
+  # Asocia la API Key al Usage Plan
   UsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
     Properties:
@@ -388,6 +390,3 @@ Outputs:
   ApiKeyId:
     Description: "ID de la API Key"
     Value: !Ref ApiKey
-  DdbTable:
-    Description: "Tabla DynamoDB"
-    Value: !Ref MoviesTable

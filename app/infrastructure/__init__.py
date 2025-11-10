@@ -5,5 +5,6 @@ __all__ = [
     'DynamoDBMovieRepository',
     'DynamoDBUnitOfWork',
     'command_handlers',
-    'queries_handlers'
+    'queries_handlers',
+    'aws_lambdas'
 ]

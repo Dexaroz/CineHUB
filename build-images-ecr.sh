@@ -5,7 +5,7 @@ Region="us-east-1"
 StackEcr="cinehub-ecr"
 ImageName="cinehub"
 ImageTag="latest"
-Dockerfile="Dockerfile"
+Dockerfile="Dockerfile.acoplada"
 ContextDir="."
 EcrUriOverride=""
 

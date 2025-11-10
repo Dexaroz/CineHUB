@@ -1,6 +1,3 @@
-import random
-
-
 from app.application.commands.create_movie import CreateMovie
 from app.application.id_generator.id_incremental_generator import id_generator
 from app.application.unit_of_work import UnitOfWork

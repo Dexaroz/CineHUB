@@ -446,8 +446,6 @@ Resources:
     Properties:
       Name: movies-api-key
       Enabled: true
-      # Opcional: fija un valor conocido para facilitar pruebas
-      # Value: your-strong-random-key
 
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
