@@ -5,7 +5,7 @@ Parameters:
   ImageName:
     Type: String
     Description: ECR Image Name
-    Default: movies-app:latest
+    Default: movie-app:latest
 
   VpcId:
     Type: AWS::EC2::VPC::Id
